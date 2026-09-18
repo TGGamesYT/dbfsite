@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy &amp; your data — Dead by Flashlight</title>
+<meta name="description" content="What Dead by Flashlight stores when you sign in with Google, why, and how to delete it.">
+<style>
+/*
+ * The site's look, taken off the PRELOBBY ART.
+ *
+ * <p>Not DbfScreen's constants. Those are the colours text and one-pixel borders
+ * are drawn IN — a readable blue, a readable green — and a page built out of
+ * them came out looking like a settings dialog. The art is what the game
+ * actually looks like: sampled across the lobby background, the fog layer and
+ * the ready button, it is near-black, a cold desaturated grey-teal for anything
+ * lifted off it, and blood red for the one thing that matters on screen.
+ *
+ * <p>So: almost nothing is bright, the accent is red rather than blue, and the
+ * only warm colour on the page is the colour of blood. Sampled values are in the
+ * comments so the next person can check them rather than guess.
+ */
+
+:root {
+  /* #000000 dominates the lobby background outright. */
+  --bg: #07080a;
+  /* Lifted just enough to read as a panel against it. */
+  --panel: #0e1113;
+  --panel-raised: #151a1c;
+  /* The fog layer sits at #203030/#303030 — cold, desaturated, never blue. */
+  --border: #273030;
+  --border-lit: #3c4747;
+  --text: #dfe3e2;
+  --muted: #8b9492;
+  --dim: #5d6764;
+  /* The ready button's reds: #700000 in the body, #200000 in its shadow. */
+  --red: #a81717;
+  --red-lit: #d92c2c;
+  --green: #5f9e5c;
+  --gold: #c8a23c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The fog, and the dark closing in at the edges.
+   Two layers, both from the art: a cold grey-teal haze low in the middle where
+   the lobby's fog sits, and a vignette that takes the corners back to black. No
+   image is shipped for it — it is a gradient doing what the art does. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 120% 60% at 50% 100%, rgba(48, 64, 64, 0.30), transparent 70%),
+    radial-gradient(ellipse 90% 70% at 50% 0%, rgba(32, 48, 48, 0.22), transparent 65%);
+}
+
+/* ...and the corners, over everything, so the page ends in the dark. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: inset 0 0 220px 70px rgba(0, 0, 0, 0.85);
+}
+
+.wrap, .modal { z-index: 2; }
+
+.wrap {
+  position: relative;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 56px 20px 96px;
+}
+
+header.site {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+h1 {
+  font-size: 31px;
+  /* Wide and upright, the way the game's own headings are set. */
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  margin: 0;
+  font-weight: 700;
+  color: var(--text);
+  text-shadow: 0 0 22px rgba(168, 23, 23, 0.30);
+}
+
+h2 {
+  font-size: 18px;
+  margin: 34px 0 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+h3 {
+  font-size: 15px;
+  margin: 22px 0 6px;
+  font-weight: 600;
+  color: var(--red-lit);
+}
+
+p { margin: 10px 0; }
+
+a { color: var(--red-lit); }
+a:hover { color: #ff5555; }
+
+.tag {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.lede {
+  color: var(--muted);
+  font-size: 17px;
+}
+
+nav.top {
+  margin: 28px 0 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+nav.top a {
+  display: inline-block;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+nav.top a:hover { border-color: var(--border-lit); color: var(--text); }
+nav.top a[aria-current="page"] { color: var(--text); border-color: var(--red); }
+
+.panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 18px 20px;
+  margin: 18px 0;
+}
+
+ul { margin: 10px 0; padding-left: 20px; }
+li { margin: 5px 0; }
+
+.muted { color: var(--muted); }
+.dim { color: var(--dim); font-size: 14px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 15px;
+}
+
+th, td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th { color: var(--muted); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; }
+
+button, .btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 10px 18px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+button:hover:not(:disabled), .btn:hover { border-color: var(--border-lit); color: var(--text); }
+button:disabled { color: var(--dim); cursor: default; }
+
+button.danger { border-color: #4a1616; color: var(--red-lit); }
+button.danger:hover:not(:disabled) { border-color: var(--red-lit); background: #1a0b0b; }
+
+footer.site {
+  margin-top: 56px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  color: var(--dim);
+  font-size: 13px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+footer.site a { color: var(--dim); }
+
+/* The deletion panel's own states. */
+#account { margin-top: 10px; }
+.ok { color: var(--green); }
+.bad { color: var(--red-lit); }
+
+/* The confirmation, over everything. */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 20px;
+  z-index: 10;
+}
+
+.modal[open] { display: flex; }
+
+.modal .box {
+  border: 1px solid var(--border-lit);
+  background: var(--panel-raised);
+  padding: 24px;
+  max-width: 460px;
+  width: 100%;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
+}
+
+.modal h2 { margin-top: 0; }
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+@media (max-width: 560px) {
+  .wrap { padding: 36px 16px 72px; }
+  h1 { font-size: 25px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="site">
+    <h1>Privacy &amp; your data</h1>
+    <span class="tag">Dead by Flashlight</span>
+  </header>
+
+  <nav class="top">
+    <a href="index.html">Home</a>
+    <a href="privacy.html" aria-current="page">Privacy &amp; your data</a>
+  </nav>
+
+  <p class="lede">
+    Signing in with Google is optional, and it is used for exactly one thing:
+    finding out which YouTube channel you are, so the mod can check whether you
+    are a member of the project's channel and hand you a cape if you are.
+  </p>
+
+  <h2>What we ask Google for</h2>
+  <p>
+    One scope: <code>youtube.readonly</code>. It lets us read your channel's
+    public details — its id and its name. We do not post, subscribe, comment,
+    change anything, or read anything private.
+  </p>
+  <p>
+    If you are the owner of the project's own channel, signing in also asks for
+    <code>youtube.channel-memberships.creator</code>. That is what makes
+    "is this viewer a member?" answerable at all — only a creator may list their
+    own members — and it is asked of the channel owner alone, never of a viewer.
+  </p>
+
+  <h2>What is stored, and where</h2>
+  <p>
+    On the project's own server, and nowhere else. Nothing is sold, shared, or
+    sent to anybody: there is no analytics, no advertising and no third party
+    involved beyond Google itself.
+  </p>
+
+  <table>
+    <tr><th>What</th><th>Why</th><th>How long</th></tr>
+    <tr>
+      <td>Your YouTube channel id and name, against your Minecraft account</td>
+      <td>So a membership check knows which channel to check, and so one channel
+          cannot claim a cape on several Minecraft accounts</td>
+      <td>Until you delete it</td>
+    </tr>
+    <tr>
+      <td>Whether you held a membership, and for how many months</td>
+      <td>The member cape has tiers, and the tier is the number of months</td>
+      <td>Until you delete it</td>
+    </tr>
+    <tr>
+      <td>The capes that earned you</td>
+      <td>So you keep them between sessions</td>
+      <td>Until you delete it</td>
+    </tr>
+  </table>
+
+  <h3>What is <em>not</em> stored</h3>
+  <ul>
+    <li>Your Google password — we never see it. Sign-in happens on Google's own
+      page and we are handed a token afterwards.</li>
+    <li>Your email address.</li>
+    <li>Any Google token, once the sign-in has finished. The short-lived access
+      token is used to read your channel and then discarded. We do not keep a
+      refresh token for viewers at all.</li>
+    <li>Your watch history, subscriptions, or anything else about your account.</li>
+  </ul>
+  <p class="dim">
+    The one exception is the project channel's OWNER, whose long-lived token is
+    kept so membership checks can run. That is their own account's data and the
+    button below deletes it for them like anybody else's.
+  </p>
+
+  <h2>Game data is separate</h2>
+  <p>
+    Your bloodpoints, perks, killers and match history are not Google's data and
+    are not part of this. Deleting your Google data below leaves your progress
+    alone — it only takes away the link to your channel and what that link
+    earned you.
+  </p>
+
+  <h2>Delete your data</h2>
+  <p>
+    Sign in with the same Google account you used in game, and this will show you
+    exactly what is held and delete it on the spot.
+  </p>
+
+  <div class="panel">
+    <div id="account"><p class="muted">Checking…</p></div>
+  </div>
+
+  <h2>Anything else</h2>
+  <p>
+    If you would rather ask a person, or you cannot sign in any more and still
+    want your data gone, get in touch through the project's channel and it will
+    be deleted by hand.
+  </p>
+
+  <footer class="site">
+    <a href="index.html">Home</a>
+    <a href="privacy.html">Privacy &amp; your data</a>
+    <span>A fan project. Not affiliated with Behaviour Interactive or Mojang.</span>
+  </footer>
+
+</div>
+
+<!-- The confirmation, and the result. Deleting is not undoable and the button
+     is on a page people arrive at by accident, so it is asked for twice. -->
+<div class="modal" id="confirm">
+  <div class="box">
+    <h2>Delete your data?</h2>
+    <p class="muted">
+      This removes the link between your YouTube channel and your Minecraft
+      account, and any capes that link earned you. It cannot be undone. Your
+      bloodpoints, perks and killers are not affected.
+    </p>
+    <div class="row">
+      <button class="danger" id="reallyDelete">Yes, delete it</button>
+      <button id="cancelDelete">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="done">
+  <div class="box">
+    <h2 id="doneTitle">Deleted</h2>
+    <p id="doneBody" class="muted"></p>
+    <div class="row">
+      <button id="doneOk">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// The page is a thin front for four endpoints. Every decision — who you are,
+// what is held, what a deletion removes — is the server's; this asks and draws.
+(function () {
+  // WHERE THE COORDINATOR ANSWERS.
+  //
+  // This page is a standalone file — it is hosted wherever suits and is not part
+  // of the game's server — so every call it makes is cross-origin and absolute.
+  // Set it to the origin the coordinator is reachable on, with no trailing
+  // slash. Leave it empty and the page still serves and still says what is
+  // collected; only the button goes quiet, which is better than a policy that
+  // stops being readable because a deployment setting is missing.
+  var COORDINATOR = '';
+
+  var account = document.getElementById('account');
+  var confirmModal = document.getElementById('confirm');
+  var doneModal = document.getElementById('done');
+
+  function el(html) { account.innerHTML = html; }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function signedOut(note) {
+    el((note ? '<p class="bad">' + esc(note) + '</p>' : '')
+      + '<p class="muted">You are not signed in.</p>'
+      + (COORDINATOR
+          ? '<div class="row"><a class="btn" href="' + COORDINATOR
+            + '/auth/login">Sign in with Google</a></div>'
+          : '<p class="dim">Sign-in is not configured on this copy of the page.</p>'));
+  }
+
+  function render(me) {
+    if (!me || !me.signedIn) { signedOut(me && me.error); return; }
+    var lines = '<p>Signed in as <strong>' + esc(me.title || me.channelId) + '</strong>.</p>';
+    if (!me.hasData) {
+      lines += '<p class="muted">We hold nothing for this channel — there is'
+             + ' nothing to delete.</p>'
+             + '<div class="row"><button id="out">Sign out</button></div>';
+    } else {
+      lines += '<p class="muted">Linked to a Minecraft account'
+             + (me.linkedAt ? ' on ' + esc(new Date(me.linkedAt).toLocaleDateString()) : '')
+             + '.</p>'
+             + '<div class="row">'
+             + '<button class="danger" id="del">Delete my data</button>'
+             + '<button id="out">Sign out</button>'
+             + '</div>';
+    }
+    el(lines);
+    var del = document.getElementById('del');
+    if (del) del.onclick = function () { confirmModal.setAttribute('open', ''); };
+    document.getElementById('out').onclick = signOut;
+  }
+
+  function load() {
+    if (!COORDINATOR) { signedOut(); return; }
+    fetch(COORDINATOR + '/auth/me', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () { signedOut('Could not reach the server.'); });
+  }
+
+  function signOut() {
+    fetch(COORDINATOR + '/auth/logout', { method: 'POST', credentials: 'include' })
+      .then(function () { signedOut(); })
+      .catch(function () { signedOut(); });
+  }
+
+  document.getElementById('cancelDelete').onclick = function () {
+    confirmModal.removeAttribute('open');
+  };
+
+  document.getElementById('reallyDelete').onclick = function () {
+    var btn = this;
+    btn.disabled = true;
+    fetch(COORDINATOR + '/auth/delete', { method: 'POST', credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (body) {
+        confirmModal.removeAttribute('open');
+        btn.disabled = false;
+        var ok = body && body.ok;
+        document.getElementById('doneTitle').textContent = ok
+          ? 'Your data has been deleted'
+          : 'Nothing was deleted';
+        document.getElementById('doneTitle').className = ok ? 'ok' : 'bad';
+        document.getElementById('doneBody').textContent = ok
+          ? (body.removed && body.removed.length
+              ? 'Removed: ' + body.removed.join(', ') + '. You have been signed out.'
+              : 'There was nothing left to remove. You have been signed out.')
+          : (body && body.error) || 'Something went wrong. Please try again.';
+        doneModal.setAttribute('open', '');
+        // Deleting signs you out: the session proved a channel we no longer
+        // hold anything for, and leaving it live would be a grant on your
+        // Google account that outlived the thing it was for.
+        if (ok) signedOut();
+      })
+      .catch(function () {
+        btn.disabled = false;
+        confirmModal.removeAttribute('open');
+        document.getElementById('doneTitle').textContent = 'Nothing was deleted';
+        document.getElementById('doneTitle').className = 'bad';
+        document.getElementById('doneBody').textContent = 'Could not reach the server.';
+        doneModal.setAttribute('open', '');
+      });
+  };
+
+  document.getElementById('doneOk').onclick = function () {
+    doneModal.removeAttribute('open');
+  };
+
+  load();
+})();
+</script>
+</body>
+</html>

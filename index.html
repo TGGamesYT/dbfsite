@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dead by Flashlight</title>
+<meta name="description" content="A Dead by Daylight-style asymmetric horror mod for Minecraft: one killer, four survivors, five generators.">
+<style>
+/*
+ * The site's look, taken off the PRELOBBY ART.
+ *
+ * <p>Not DbfScreen's constants. Those are the colours text and one-pixel borders
+ * are drawn IN — a readable blue, a readable green — and a page built out of
+ * them came out looking like a settings dialog. The art is what the game
+ * actually looks like: sampled across the lobby background, the fog layer and
+ * the ready button, it is near-black, a cold desaturated grey-teal for anything
+ * lifted off it, and blood red for the one thing that matters on screen.
+ *
+ * <p>So: almost nothing is bright, the accent is red rather than blue, and the
+ * only warm colour on the page is the colour of blood. Sampled values are in the
+ * comments so the next person can check them rather than guess.
+ */
+
+:root {
+  /* #000000 dominates the lobby background outright. */
+  --bg: #07080a;
+  /* Lifted just enough to read as a panel against it. */
+  --panel: #0e1113;
+  --panel-raised: #151a1c;
+  /* The fog layer sits at #203030/#303030 — cold, desaturated, never blue. */
+  --border: #273030;
+  --border-lit: #3c4747;
+  --text: #dfe3e2;
+  --muted: #8b9492;
+  --dim: #5d6764;
+  /* The ready button's reds: #700000 in the body, #200000 in its shadow. */
+  --red: #a81717;
+  --red-lit: #d92c2c;
+  --green: #5f9e5c;
+  --gold: #c8a23c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The fog, and the dark closing in at the edges.
+   Two layers, both from the art: a cold grey-teal haze low in the middle where
+   the lobby's fog sits, and a vignette that takes the corners back to black. No
+   image is shipped for it — it is a gradient doing what the art does. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 120% 60% at 50% 100%, rgba(48, 64, 64, 0.30), transparent 70%),
+    radial-gradient(ellipse 90% 70% at 50% 0%, rgba(32, 48, 48, 0.22), transparent 65%);
+}
+
+/* ...and the corners, over everything, so the page ends in the dark. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: inset 0 0 220px 70px rgba(0, 0, 0, 0.85);
+}
+
+.wrap, .modal { z-index: 2; }
+
+.wrap {
+  position: relative;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 56px 20px 96px;
+}
+
+header.site {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+h1 {
+  font-size: 31px;
+  /* Wide and upright, the way the game's own headings are set. */
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  margin: 0;
+  font-weight: 700;
+  color: var(--text);
+  text-shadow: 0 0 22px rgba(168, 23, 23, 0.30);
+}
+
+h2 {
+  font-size: 18px;
+  margin: 34px 0 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+h3 {
+  font-size: 15px;
+  margin: 22px 0 6px;
+  font-weight: 600;
+  color: var(--red-lit);
+}
+
+p { margin: 10px 0; }
+
+a { color: var(--red-lit); }
+a:hover { color: #ff5555; }
+
+.tag {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.lede {
+  color: var(--muted);
+  font-size: 17px;
+}
+
+nav.top {
+  margin: 28px 0 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+nav.top a {
+  display: inline-block;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+nav.top a:hover { border-color: var(--border-lit); color: var(--text); }
+nav.top a[aria-current="page"] { color: var(--text); border-color: var(--red); }
+
+.panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 18px 20px;
+  margin: 18px 0;
+}
+
+ul { margin: 10px 0; padding-left: 20px; }
+li { margin: 5px 0; }
+
+.muted { color: var(--muted); }
+.dim { color: var(--dim); font-size: 14px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 15px;
+}
+
+th, td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th { color: var(--muted); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; }
+
+button, .btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 10px 18px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+button:hover:not(:disabled), .btn:hover { border-color: var(--border-lit); color: var(--text); }
+button:disabled { color: var(--dim); cursor: default; }
+
+button.danger { border-color: #4a1616; color: var(--red-lit); }
+button.danger:hover:not(:disabled) { border-color: var(--red-lit); background: #1a0b0b; }
+
+footer.site {
+  margin-top: 56px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  color: var(--dim);
+  font-size: 13px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+footer.site a { color: var(--dim); }
+
+/* The deletion panel's own states. */
+#account { margin-top: 10px; }
+.ok { color: var(--green); }
+.bad { color: var(--red-lit); }
+
+/* The confirmation, over everything. */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 20px;
+  z-index: 10;
+}
+
+.modal[open] { display: flex; }
+
+.modal .box {
+  border: 1px solid var(--border-lit);
+  background: var(--panel-raised);
+  padding: 24px;
+  max-width: 460px;
+  width: 100%;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
+}
+
+.modal h2 { margin-top: 0; }
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+@media (max-width: 560px) {
+  .wrap { padding: 36px 16px 72px; }
+  h1 { font-size: 25px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="site">
+    <h1>Dead by Flashlight</h1>
+    <span class="tag">Minecraft mod</span>
+  </header>
+
+  <nav class="top">
+    <a href="index.html" aria-current="page">Home</a>
+    <a href="privacy.html">Privacy &amp; your data</a>
+  </nav>
+
+  <p class="lede">
+    One killer, four survivors, five generators. An asymmetric horror game built
+    inside Minecraft, in the shape of <em>Dead by Daylight</em>.
+  </p>
+
+  <h2>What it is</h2>
+  <p>
+    Dead by Flashlight is a Fabric mod for Minecraft. Four survivors start in the
+    dark with nothing but a torch and each other; one player hunts them. The
+    survivors repair five generators to power the exit gates and get out. The
+    killer's job is to stop all four of them.
+  </p>
+  <p>
+    Everything you would expect from the genre is here: generators with skill
+    checks, pallets to drop and vault, lockers to hide in, hooks to be sacrificed
+    on, perks and add-ons and offerings, a bloodweb to spend bloodpoints in.
+    Three killers so far, each with a rigged model, an animation set and a power
+    of their own.
+  </p>
+
+  <h2>How a round runs</h2>
+  <div class="panel">
+    <ul>
+      <li><strong>Generators.</strong> Five of them, held down and repaired, with
+        skill checks that wake the whole map when you miss one.</li>
+      <li><strong>The chase.</strong> Pallets, windows, scratch marks, a heartbeat
+        that grows as the killer closes.</li>
+      <li><strong>Hooks.</strong> Downed survivors are carried and hung. Three
+        hooks and you are out of the trial; a teammate can take you off the
+        first two.</li>
+      <li><strong>The exit.</strong> Five generators powers two gates. The hatch
+        opens for the last survivor alive.</li>
+    </ul>
+  </div>
+
+  <h2>Playing it</h2>
+  <p>
+    Rounds are matched by a small coordinator server and then played peer to
+    peer: one player hosts the world and the rest connect to them, so there is no
+    central game server to keep alive. Between rounds you sit in a lobby, spend
+    what you earned, and pick what you are bringing.
+  </p>
+
+  <h2>Cosmetics, and signing in with Google</h2>
+  <p>
+    The in-game store has capes and killer skins. Most are bought with in-game
+    currency. A couple are given to people who are members of the project's
+    YouTube channel, and that is the <em>only</em> reason the mod ever asks you to
+    sign in with Google: to find out which channel you are, so it can check
+    whether you are a member.
+  </p>
+  <p>
+    Signing in is optional — nothing in the game is locked behind it except those
+    few capes. What is stored, and how to delete it, is on the
+    <a href="privacy.html">privacy page</a>, along with a button that does it.
+  </p>
+
+  <footer class="site">
+    <a href="index.html">Home</a>
+    <a href="privacy.html">Privacy &amp; your data</a>
+    <span>A fan project. Not affiliated with Behaviour Interactive or Mojang.</span>
+  </footer>
+
+</div>
+</body>
+</html>
